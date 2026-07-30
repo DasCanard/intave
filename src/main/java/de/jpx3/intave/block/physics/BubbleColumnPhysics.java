@@ -13,8 +13,10 @@ package de.jpx3.intave.block.physics;
 
 import de.jpx3.intave.adapter.MinecraftVersion;
 import de.jpx3.intave.block.access.VolatileBlockAccess;
+import de.jpx3.intave.block.fluid.Fluid;
 import de.jpx3.intave.block.variant.BlockVariant;
 import de.jpx3.intave.check.movement.physics.environment.SimulationEnvironment;
+import de.jpx3.intave.share.BlockPosition;
 import de.jpx3.intave.share.Motion;
 import de.jpx3.intave.user.User;
 import de.jpx3.intave.user.meta.MovementMetadata;
@@ -42,14 +44,17 @@ final class BubbleColumnPhysics implements BlockPhysic {
   public Motion entityInside(User user, SimulationEnvironment environment, Location location, Location from, double motionX, double motionY, double motionZ) {
     ProtocolMetadata protocol = user.meta().protocol();
     if (protocol.aquaticUpdate()) {
-      boolean water = VolatileBlockAccess.fluidAccess(user, location.clone().add(0, 1, 0)).isOfWater();
+      BlockPosition above = new BlockPosition(location).up();
+      Fluid fluidAbove = VolatileBlockAccess.fluidAccess(user, above);
+      boolean surface = protocol.newBlockEntityIntersectionLogic()
+        ? fluidAbove.isDry() && user.blockCache().collisionShapeAt(above).isEmpty()
+        : !fluidAbove.isOfWater();
       BlockVariant variant = VolatileBlockAccess.variantAccess(user, location);
       boolean downwards = variant.propertyOf("drag");
-      if (water) {
-        return enterBubbleColumn(user, downwards, motionX, motionY, motionZ);
-      } else {
+      if (surface) {
         return enterBubbleColumnWithAirAbove(downwards, motionX, motionY, motionZ);
       }
+      return enterBubbleColumn(user, downwards, motionX, motionY, motionZ);
     }
     return null;
   }
@@ -71,7 +76,7 @@ final class BubbleColumnPhysics implements BlockPhysic {
     } else {
       motionY = Math.min(1.8D, motionY + 0.1D);
     }
-	  return new Motion(motionX, motionY, motionZ);
+    return new Motion(motionX, motionY, motionZ);
   }
 
   @Override

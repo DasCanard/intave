@@ -15,9 +15,11 @@ import de.jpx3.intave.IntaveControl;
 import de.jpx3.intave.adapter.MinecraftVersions;
 import de.jpx3.intave.block.access.VolatileBlockAccess;
 import de.jpx3.intave.block.fluid.Fluids;
+import de.jpx3.intave.block.intersection.BlockIntersection;
 import de.jpx3.intave.block.physics.BlockPhysics;
 import de.jpx3.intave.block.physics.BlockProperties;
 import de.jpx3.intave.block.shape.BlockShape;
+import de.jpx3.intave.block.type.BlockTypeAccess;
 import de.jpx3.intave.check.movement.physics.config.MovementConfiguration;
 import de.jpx3.intave.check.movement.physics.environment.MovementCharacteristics;
 import de.jpx3.intave.check.movement.physics.environment.Pose;
@@ -507,8 +509,8 @@ class BaseSimulator extends Simulator {
       simulateNormalAfter(user, environment, configuration, motion, gravity, slipperiness);
     }
 
-    if (user.meta().protocol().newBlockEntityIntersectionLogic()) {
-      simulateApplyEffectsFromBlocks(user, environment, motion, boundingBox);
+    if (clientData.newBlockEntityIntersectionLogic()) {
+      simulateApplyEffectsFromBlocks(user, environment, motion);
     }
 
     if (clientData.combatUpdate()
@@ -586,34 +588,36 @@ class BaseSimulator extends Simulator {
 
     environment.aquaticUpdateLavaReset();
 
-//    if (!user.meta().protocol().newBlockEntityIntersectionLogic()) {
     double limit = 1.0E-7D;
     int blockPositionStartX = floor(entityBoundingBox.minX + limit);
-      int blockPositionStartY = floor(entityBoundingBox.minY + limit);
-      int blockPositionStartZ = floor(entityBoundingBox.minZ + limit);
-      int blockPositionEndX = floor(entityBoundingBox.maxX - limit);
-      int blockPositionEndY = floor(entityBoundingBox.maxY - limit);
-      int blockPositionEndZ = floor(entityBoundingBox.maxZ - limit);
+    int blockPositionStartY = floor(entityBoundingBox.minY + limit);
+    int blockPositionStartZ = floor(entityBoundingBox.minZ + limit);
+    int blockPositionEndX = floor(entityBoundingBox.maxX - limit);
+    int blockPositionEndY = floor(entityBoundingBox.maxY - limit);
+    int blockPositionEndZ = floor(entityBoundingBox.maxZ - limit);
 
-      Location blockCollisionFrom = new Location(world, positionX, positionY, positionZ);
-      for (int x = blockPositionStartX; x <= blockPositionEndX; x++) {
-        for (int y = blockPositionStartY; y <= blockPositionEndY; y++) {
-          for (int z = blockPositionStartZ; z <= blockPositionEndZ; z++) {
-            Location location = new Location(world, x, y, z);
-            Material material = VolatileBlockAccess.typeAccess(user, world, x, y, z);
-            Motion collisionMotion = BlockPhysics.entityInside(
-              user, material,
-              environment,
-              location, blockCollisionFrom,
-              motion.motionX, motion.motionY, motion.motionZ
-            );
-            if (collisionMotion != null) {
-              motion.setTo(collisionMotion);
-            }
+    Location blockCollisionFrom = new Location(world, positionX, positionY, positionZ);
+    for (int x = blockPositionStartX; x <= blockPositionEndX; x++) {
+      for (int y = blockPositionStartY; y <= blockPositionEndY; y++) {
+        for (int z = blockPositionStartZ; z <= blockPositionEndZ; z++) {
+          Material material = VolatileBlockAccess.typeAccess(user, world, x, y, z);
+          if (clientData.newBlockEntityIntersectionLogic()
+            && material == BlockTypeAccess.BUBBLE_COLUMN) {
+            continue;
+          }
+          Location location = new Location(world, x, y, z);
+          Motion collisionMotion = BlockPhysics.entityInside(
+            user, material,
+            environment,
+            location, blockCollisionFrom,
+            motion.motionX, motion.motionY, motion.motionZ
+          );
+          if (collisionMotion != null) {
+            motion.setTo(collisionMotion);
           }
         }
       }
-//    }
+    }
 
     if (clientData.protocolVersion() >= VER_1_14 && environment.pose() != Pose.FALL_FLYING) {
       int soulSandModifier = Enchantments.resolveSoulSpeedModifier(player);
@@ -626,49 +630,61 @@ class BaseSimulator extends Simulator {
   }
 
   private void simulateApplyEffectsFromBlocks(
-    User user, SimulationEnvironment environment, Motion motion, BoundingBox boundingBox
+    User user, SimulationEnvironment environment, Motion motion
   ) {
     Position from = environment.verifiedLastPosition();
     Position to = environment.position();
-    Motion move = from.motionTo(to);
-
-    SimulationResult simulationResult = environment.simulationResult();
-    if (simulationResult == null || simulationResult.isValid()) {
-      return;
-    }
-    Motion crazyMotion = simulationResult.intermittentResult();
-
+    Motion movement = from.motionTo(to);
     LongSet visitedBlocks = new LongOpenHashSet();
 
-		int i = 16;
-    if (crazyMotion != null && move.lengthSquared() > 0.0) {
-      for (Direction.Axis axis : Direction.axisStepOrder(crazyMotion)) {
-        double motionPartial = crazyMotion.partialMotionIn(axis);
-        if (motionPartial != 0.0) {
-	        Position positionPartial = from.relative(axis.positive(), motionPartial);
-	        i -= checkInsideBlocks(user, environment, from, positionPartial, visitedBlocks, i);
-					from = positionPartial;
+    if (movement.lengthSquared() > 0.0) {
+      for (Direction.Axis axis : Direction.axisStepOrder(movement)) {
+        double movementOnAxis = movement.partialMotionIn(axis);
+        if (movementOnAxis != 0.0) {
+          Position axisDestination = from.relative(axis.positive(), movementOnAxis);
+          applyBubbleColumnsBetween(
+            user, environment, from, axisDestination, motion, visitedBlocks
+          );
+          from = axisDestination;
         }
       }
     } else {
-			i -= checkInsideBlocks(user, environment, from, to, visitedBlocks, i);
+      applyBubbleColumnsBetween(user, environment, from, to, motion, visitedBlocks);
     }
-		if (i <= 0) {
-			checkInsideBlocks(user, environment, from, to, visitedBlocks, 1);
-		}
   }
 
-  private int checkInsideBlocks(
+  private void applyBubbleColumnsBetween(
     User user,
-		SimulationEnvironment environment,
+    SimulationEnvironment environment,
     Position from, Position to,
-    LongSet visitedBlocks,
-    int limit
+    Motion motion,
+    LongSet visitedBlocks
   ) {
-	  BoundingBox box = BoundingBox.fromPosition(user, environment, to).shrink(0.00001f);
-		boolean furtherThanOneBlock = from.distanceSquared(to) > (0.9999900000002526 * 0.9999900000002526);
-
-    return 0;
+    World world = user.player().getWorld();
+    Location movementTarget = to.toLocation(world);
+    BoundingBox destinationBox =
+      BoundingBox.fromPosition(user, environment, to).shrink(1.0E-5F);
+    BlockIntersection.forEachBlockIntersectedBetween(
+      from, to, destinationBox,
+      (blockPosition, ignoredStep) -> {
+        if (!visitedBlocks.add(blockPosition.toLong())) {
+          return true;
+        }
+        Material material = VolatileBlockAccess.typeAccess(user, blockPosition);
+        if (material != BlockTypeAccess.BUBBLE_COLUMN) {
+          return true;
+        }
+        Motion collisionMotion = BlockPhysics.entityInside(
+          user, material, environment,
+          blockPosition.toLocation(world), movementTarget,
+          motion.motionX, motion.motionY, motion.motionZ
+        );
+        if (collisionMotion != null) {
+          motion.setTo(collisionMotion);
+        }
+        return true;
+      }
+    );
   }
 
   private void simulateWaterAfter(
