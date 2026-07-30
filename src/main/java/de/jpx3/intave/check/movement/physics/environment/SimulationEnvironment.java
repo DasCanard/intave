@@ -277,6 +277,7 @@ public interface SimulationEnvironment {
   boolean inWater();
   void setInWater(boolean inWater);
   boolean inLava();
+  void setInLava(boolean inLava);
   boolean inWeb();
   void resetInWeb();
   boolean onGround();
@@ -588,8 +589,6 @@ public interface SimulationEnvironment {
   default boolean onGroundWithRiptide() {
     return false;
   }
-
-  void aquaticUpdateLavaReset();
 
   float height();
   void setHeight(float height);

@@ -814,7 +814,7 @@ public final class ImmutableSimulationEnvironmentView implements SimulationEnvir
 	}
 
 	@Override
-	public void aquaticUpdateLavaReset() {
+	public void setInLava(boolean inLava) {
 		throw new UnsupportedOperationException("Cannot modify unmodifiable view");
 	}
 

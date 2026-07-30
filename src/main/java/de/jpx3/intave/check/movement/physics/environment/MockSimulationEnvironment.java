@@ -192,6 +192,7 @@ public final class MockSimulationEnvironment implements SimulationEnvironment {
     this.inWater = inWater;
   }
 
+  @Override
   public void setInLava(boolean inLava) {
     this.inLava = inLava;
   }
@@ -862,11 +863,6 @@ public final class MockSimulationEnvironment implements SimulationEnvironment {
 
   @Override
   public void updateEyesInWater() {
-
-  }
-
-  @Override
-  public void aquaticUpdateLavaReset() {
 
   }
 

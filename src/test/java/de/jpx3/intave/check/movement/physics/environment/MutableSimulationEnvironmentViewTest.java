@@ -143,6 +143,7 @@ final class MutableSimulationEnvironmentViewTest {
     view.setBoundingBox(box);
     view.setBaseMotion(0.1, 0.2, 0.3);
     view.setInWater(true);
+    view.setInLava(true);
     view.setPushedByEntity(true);
 
     MockSimulationEnvironment target = new MockSimulationEnvironment();
@@ -158,6 +159,7 @@ final class MutableSimulationEnvironmentViewTest {
     assertEquals(90.0F, target.rotationYaw(), 0.0F);
     assertEquals(45.0F, target.rotationPitch(), 0.0F);
     assertFalse(delegate.inWater());
+    assertFalse(delegate.inLava());
   }
 
   @Test

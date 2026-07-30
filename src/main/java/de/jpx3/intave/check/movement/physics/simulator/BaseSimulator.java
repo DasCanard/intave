@@ -584,7 +584,7 @@ class BaseSimulator extends Simulator {
 
     // Block collisions
 
-    environment.aquaticUpdateLavaReset();
+    environment.setInLava(false);
 
 //    if (!user.meta().protocol().newBlockEntityIntersectionLogic()) {
     double limit = 1.0E-7D;

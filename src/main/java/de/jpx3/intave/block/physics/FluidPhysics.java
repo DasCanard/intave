@@ -18,7 +18,6 @@ import de.jpx3.intave.block.fluid.Fluid;
 import de.jpx3.intave.check.movement.physics.environment.SimulationEnvironment;
 import de.jpx3.intave.share.Motion;
 import de.jpx3.intave.user.User;
-import de.jpx3.intave.user.meta.MovementMetadata;
 import de.jpx3.intave.user.meta.ProtocolMetadata;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -44,10 +43,9 @@ final class FluidPhysics implements BlockPhysic {
   public Motion entityInside(User user, SimulationEnvironment environment, Location location, Location from, double motionX, double motionY, double motionZ) {
     ProtocolMetadata clientData = user.meta().protocol();
     if (clientData.aquaticUpdate()) {
-      MovementMetadata movementData = user.meta().movement();
       Fluid fluid = VolatileBlockAccess.fluidAccess(user, location);
       if (fluid.isOfLava()) {
-        movementData.aquaticUpdateInLava = true;
+        environment.setInLava(true);
       }
     }
     return null;

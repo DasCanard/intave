@@ -751,8 +751,8 @@ public final class MovementMetadata implements SimulationEnvironment {
 	}
 
   @Override
-  public void aquaticUpdateLavaReset() {
-    aquaticUpdateInLava = false;
+  public void setInLava(boolean inLava) {
+    aquaticUpdateInLava = inLava;
   }
 
   @Override

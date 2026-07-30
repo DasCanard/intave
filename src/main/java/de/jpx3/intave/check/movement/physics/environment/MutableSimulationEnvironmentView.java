@@ -990,10 +990,10 @@ public final class MutableSimulationEnvironmentView implements SimulationEnviron
   }
 
   @Override
-  public void aquaticUpdateLavaReset() {
+  public void setInLava(boolean inLava) {
     inLavaOverridden = true;
-    inLava = false;
-    deferredMutations.add(SimulationEnvironment::aquaticUpdateLavaReset);
+    this.inLava = inLava;
+    deferredMutations.add(environment -> environment.setInLava(inLava));
   }
 
   @Override
@@ -1268,8 +1268,8 @@ public final class MutableSimulationEnvironmentView implements SimulationEnviron
     if (inWaterOverridden) {
       other.setInWater(inWater);
     }
-    if (inLavaOverridden && !inLava) {
-      other.aquaticUpdateLavaReset();
+    if (inLavaOverridden) {
+      other.setInLava(inLava);
     }
     if (inWebOverridden && !inWeb) {
       other.resetInWeb();

@@ -971,7 +971,7 @@ public final class ImmutableSimulationEnvironmentCopy implements SimulationEnvir
 	}
 
 	@Override
-	public void aquaticUpdateLavaReset() {
+	public void setInLava(boolean inLava) {
 		throw immutableCopyException();
 	}
 
@@ -1087,7 +1087,7 @@ public final class ImmutableSimulationEnvironmentCopy implements SimulationEnvir
 		other.setJumpMotion(jumpMotion);
 		other.setInWater(inWater);
 		if (!inLava) {
-			other.aquaticUpdateLavaReset();
+			other.setInLava(false);
 		}
 		if (!inWeb) {
 			other.resetInWeb();
