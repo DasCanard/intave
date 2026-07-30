@@ -635,10 +635,16 @@ class BaseSimulator extends Simulator {
     Position from = environment.verifiedLastPosition();
     Position to = environment.position();
     Motion movement = from.motionTo(to);
+    Motion axisOrder = movement;
+    SimulationResult result = environment.simulationResult();
+    if (user.meta().protocol().directionalBlockEntityIntersectionLogic()
+      && result != null && result.intermittentResult() != null) {
+      axisOrder = result.intermittentResult();
+    }
     LongSet visitedBlocks = new LongOpenHashSet();
 
     if (movement.lengthSquared() > 0.0) {
-      for (Direction.Axis axis : Direction.axisStepOrder(movement)) {
+      for (Direction.Axis axis : Direction.axisStepOrder(axisOrder)) {
         double movementOnAxis = movement.partialMotionIn(axis);
         if (movementOnAxis != 0.0) {
           Position axisDestination = from.relative(axis.positive(), movementOnAxis);
@@ -664,14 +670,17 @@ class BaseSimulator extends Simulator {
     Location movementTarget = to.toLocation(world);
     BoundingBox destinationBox =
       BoundingBox.fromPosition(user, environment, to).shrink(1.0E-5F);
-    BlockIntersection.forEachBlockIntersectedBetween(
-      from, to, destinationBox,
+    BlockIntersection.BlockStepVisitor visitor =
       (blockPosition, ignoredStep) -> {
-        if (!visitedBlocks.add(blockPosition.toLong())) {
+        Material material = VolatileBlockAccess.typeAccess(user, blockPosition);
+        if (material != BlockTypeAccess.BUBBLE_COLUMN
+          || !visitedBlocks.add(blockPosition.toLong())) {
           return true;
         }
-        Material material = VolatileBlockAccess.typeAccess(user, blockPosition);
-        if (material != BlockTypeAccess.BUBBLE_COLUMN) {
+        if (user.meta().protocol().directionalBlockEntityIntersectionLogic()
+          && !BlockIntersection.isPreciseIntersection(
+          from, to, destinationBox, blockPosition
+        )) {
           return true;
         }
         Motion collisionMotion = BlockPhysics.entityInside(
@@ -683,8 +692,17 @@ class BaseSimulator extends Simulator {
           motion.setTo(collisionMotion);
         }
         return true;
-      }
-    );
+      };
+    if (user.meta().protocol().directionalBlockEntityIntersectionLogic()) {
+      BlockIntersection.forEachBlockIntersectedBetweenDirectional(
+        from, to, destinationBox, visitor
+      );
+    } else {
+      BlockIntersection.forEachBlockIntersectedBetween(
+        from, to, destinationBox,
+        visitor
+      );
+    }
   }
 
   private void simulateWaterAfter(

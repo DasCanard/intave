@@ -25,9 +25,7 @@ import static de.jpx3.intave.share.ClientMath.floor;
 /**
  * Finds blocks touched by an entity between two positions.
  *
- * <p>This follows the 1.21.7 {@code BlockGetter.forEachBlockIntersectedBetween}
- * behavior. The step number and early exit are kept because the generic
- * inside-block effect collector can use both when several effects overlap.</p>
+ * <p>Implements the client traversal variants used by inside-block effects.</p>
  */
 public final class BlockIntersection {
   private static final double SHORT_MOVEMENT_LIMIT = 0.99999F * 0.99999F;
@@ -56,6 +54,22 @@ public final class BlockIntersection {
       visited, originMin, destinationMin, destinationBox, visitor
     );
     return step >= 0 && visitBox(destinationBox, step + 1, visited, visitor);
+  }
+
+  public static boolean forEachBlockIntersectedBetweenDirectional(
+    Position from, Position to, BoundingBox destinationBox, BlockStepVisitor visitor
+  ) {
+    return DirectionalBlockIntersection.forEachBlockIntersectedBetween(
+      from, to, destinationBox, visitor
+    );
+  }
+
+  public static boolean isPreciseIntersection(
+    Position from, Position to, BoundingBox destinationBox, BlockPosition blockPosition
+  ) {
+    return DirectionalBlockIntersection.isPreciseIntersection(
+      from, to, destinationBox, blockPosition
+    );
   }
 
   private static int addCollisionsAlongTravel(
@@ -126,7 +140,7 @@ public final class BlockIntersection {
     return step;
   }
 
-  private static boolean visitBox(
+  static boolean visitBox(
     BoundingBox box, int step, LongSet visited, BlockStepVisitor visitor
   ) {
     int minX = floor(box.minX);
@@ -150,7 +164,7 @@ public final class BlockIntersection {
     return true;
   }
 
-  private static RawVector3d clipUnitBlock(
+  static RawVector3d clipUnitBlock(
     int x, int y, int z, Position from, Position to
   ) {
     double movementX = to.getX() - from.getX();
@@ -206,11 +220,11 @@ public final class BlockIntersection {
     return nearest;
   }
 
-  private static int sign(double value) {
+  static int sign(double value) {
     return value < 0.0 ? -1 : value > 0.0 ? 1 : 0;
   }
 
-  private static double fraction(double value) {
+  static double fraction(double value) {
     return value - floor(value);
   }
 

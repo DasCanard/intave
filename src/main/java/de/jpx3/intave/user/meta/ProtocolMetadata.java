@@ -23,6 +23,7 @@ import java.util.*;
 
 public final class ProtocolMetadata {
   public static int VER_26_1_1 = 775; // 26.1.1
+  public static int VER_1_21_11 = 774; // 1.21.11
   public static int VER_1_21_7 = 772; // 1.21.7
   public static int VER_1_21_5 = 770; // 1.21.5
   public static int VER_1_21_3 = 768; // 1.21.3
@@ -254,6 +255,10 @@ public final class ProtocolMetadata {
 
   public boolean newBlockEntityIntersectionLogic() {
     return protocolVersion >= VER_1_21_7;
+  }
+
+  public boolean directionalBlockEntityIntersectionLogic() {
+    return protocolVersion >= VER_1_21_11;
   }
 
   public boolean oppositeBlockVectorBehavior() {
