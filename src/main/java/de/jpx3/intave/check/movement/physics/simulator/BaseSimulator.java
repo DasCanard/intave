@@ -58,8 +58,8 @@ class BaseSimulator extends Simulator {
   ) {
     baseMotion = baseMotion.copy();
     moveOutOfBlocks(user, baseMotion, environment);
-    handleSneakInWater(user, baseMotion, environment);
     updateAquatics(user, baseMotion, environment, false);
+    handleSneakInWater(user, baseMotion, environment);
     simulateMotionClamp(user, baseMotion, environment);
     return baseMotion;
   }
