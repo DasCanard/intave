@@ -83,6 +83,36 @@ final class MutableSimulationEnvironmentViewTest {
   }
 
   @Test
+  void lavaDepthIsIsolatedCommittedAndResetWithLavaState() {
+    MockSimulationEnvironment delegate = new MockSimulationEnvironment();
+    SimulationEnvironment enteringLava = delegate.mutableView();
+
+    enteringLava.setLavaDepth(0.35);
+
+    assertFalse(delegate.inLava());
+    assertEquals(0.0, delegate.lavaDepth(), 0.0);
+    assertTrue(enteringLava.inLava());
+    assertEquals(0.35, enteringLava.lavaDepth(), 0.0);
+
+    enteringLava.commitTo(delegate);
+
+    assertTrue(delegate.inLava());
+    assertEquals(0.35, delegate.lavaDepth(), 0.0);
+
+    SimulationEnvironment leavingLava = delegate.mutableView();
+    leavingLava.aquaticUpdateLavaReset();
+
+    assertTrue(delegate.inLava());
+    assertFalse(leavingLava.inLava());
+    assertEquals(0.0, leavingLava.lavaDepth(), 0.0);
+
+    leavingLava.commitTo(delegate);
+
+    assertFalse(delegate.inLava());
+    assertEquals(0.0, delegate.lavaDepth(), 0.0);
+  }
+
+  @Test
   void updateMovementChangesViewWithoutChangingDelegate() {
     MockSimulationEnvironment delegate = new MockSimulationEnvironment();
     delegate.setPositionX(1.0);

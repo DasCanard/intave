@@ -122,6 +122,7 @@ public final class MovementMetadata implements SimulationEnvironment {
   public int reduceTicks = 0;
   public boolean onLadderLast;
   public boolean aquaticUpdateInLava;
+  public double aquaticUpdateLavaDepth;
   public AtomicInteger pendingVelocityPackets = new AtomicInteger();
   public int physicsPacketRelinkFlyVL; // In Air
   public boolean invalidMovement, suspiciousMovement;
@@ -589,8 +590,13 @@ public final class MovementMetadata implements SimulationEnvironment {
     if (sneaking && !protocol.canSprintWhileSneaking()) {
       sprintingAllowed = false;
     }
-    boolean preventWaterSprint = protocol.aquaticUpdate() && inWater() && !shouldHaveSwimmingPose();
-    if (inventoryData.inventoryOpen() || abilities.foodLevel <= 6 || preventWaterSprint) {
+    // Swim sprint can start underwater and continue after only the eyes leave the water.
+    boolean preventWaterSprint = protocol.aquaticUpdate()
+      && inWater()
+      && !shouldHaveSwimmingPose()
+      && !areEyesInWater()
+      && ticksPast(SPRINT_CHANGE) > 2;
+    if (inventoryData.inventoryOpen() || abilities.foodLevel <= 6) {
       sprintingAllowed = false;
     }
   }
@@ -606,6 +612,27 @@ public final class MovementMetadata implements SimulationEnvironment {
         -0.1f
       );
       return Collision.rasterizedLiquidSearch(user, lavaBoundingBox, Fluid::isOfLava);
+    }
+  }
+
+  @Override
+  public void setInLava(boolean inLava) {
+    aquaticUpdateInLava = inLava;
+    if (!inLava) {
+      aquaticUpdateLavaDepth = 0.0;
+    }
+  }
+
+  @Override
+  public double lavaDepth() {
+    return aquaticUpdateLavaDepth;
+  }
+
+  @Override
+  public void setLavaDepth(double lavaDepth) {
+    aquaticUpdateLavaDepth = Math.max(0.0, lavaDepth);
+    if (aquaticUpdateLavaDepth > 0.0) {
+      aquaticUpdateInLava = true;
     }
   }
 
@@ -752,7 +779,7 @@ public final class MovementMetadata implements SimulationEnvironment {
 
   @Override
   public void aquaticUpdateLavaReset() {
-    aquaticUpdateInLava = false;
+    setInLava(false);
   }
 
   @Override

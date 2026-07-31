@@ -16,6 +16,7 @@ import de.jpx3.intave.adapter.MinecraftVersions;
 import de.jpx3.intave.block.cache.MockFullBlockStaticPlane;
 import de.jpx3.intave.block.fluid.Fluid;
 import de.jpx3.intave.block.shape.BlockShape;
+import de.jpx3.intave.block.variant.BlockVariant;
 import de.jpx3.intave.check.movement.physics.environment.Pose;
 import de.jpx3.intave.codec.ByteBufStreamCodecs;
 import de.jpx3.intave.codec.StreamCodec;
@@ -42,8 +43,25 @@ import java.util.zip.DeflaterOutputStream;
 import static org.junit.jupiter.api.Assertions.*;
 
 final class MovementRecordingSerializerTest {
+	private static final StreamCodec<ByteBuf, ByteBuf, Position> NULLABLE_POSITION_CODEC =
+		Position.STREAM_CODEC.nullable(ByteBufStreamCodecs.BOOLEAN);
+	private static final StreamCodec<ByteBuf, ByteBuf, Rotation> NULLABLE_ROTATION_CODEC =
+		Rotation.STREAM_CODEC.nullable(ByteBufStreamCodecs.BOOLEAN);
+	private static final StreamCodec<ByteBuf, ByteBuf, Map<BlockPosition, MaterialVariantStore>> BLOCKS_CODEC =
+		ByteBufStreamCodecs.mapCodec(BlockPosition.STREAM_CODEC, MaterialVariantStore.STREAM_CODEC);
+	private static final StreamCodec<ByteBuf, ByteBuf, MoveFrame> UNVERSIONED_FRAME_CODEC = StreamCodec.of(
+		(buffer, frame) -> {
+			NULLABLE_POSITION_CODEC.encode(buffer, frame.moveTo());
+			NULLABLE_ROTATION_CODEC.encode(buffer, frame.rotateTo());
+			BLOCKS_CODEC.encode(buffer, frame.blocks());
+			Input.STREAM_CODEC.encode(buffer, frame.input());
+		},
+		_ -> {
+			throw new UnsupportedOperationException("This codec is used for encoding test payloads only");
+		}
+	);
 	private static final StreamCodec<ByteBuf, ByteBuf, List<MoveFrame>> LEGACY_FRAMES_CODEC =
-		MoveFrame.LEGACY_LIST_STREAM_CODEC;
+		ByteBufStreamCodecs.listCodecOf(UNVERSIONED_FRAME_CODEC);
 	private static final StreamCodec<ByteBuf, ByteBuf, Map<Material, Map<Integer, BlockShape>>> COLLISION_SHAPES_CODEC = ByteBufStreamCodecs.mapCodec(
 		ByteBufStreamCodecs.MATERIAL,
 		ByteBufStreamCodecs.mapCodec(
@@ -156,26 +174,25 @@ final class MovementRecordingSerializerTest {
 	}
 
 	@Test
-	void deserializeVersionOneFrameWithoutPhysicalPose() {
-		MoveFrame frame = new MoveFrame(
-			Position.immutableEmpty(),
-			Rotation.zero(),
-			Map.of(),
-			Input.none(),
-			true,
-			Pose.FALL_FLYING
+	void serializesBlockVariantProperties() {
+		MovementRecording recording = MovementRecording.create();
+		BlockVariant variant = testVariant(
+			7,
+			Map.of("drag", true, "distance", 3, "facing", "north")
 		);
+		recording.recordBlockVariant(Material.STONE, 7, variant);
+
 		ByteBuf buffer = Unpooled.buffer();
 		try {
-			buffer.writeInt(Integer.MIN_VALUE);
-			buffer.writeInt(1);
-			buffer.writeInt(1);
-			MoveFrame.VERSION_ONE_STREAM_CODEC.encode(buffer, frame);
+			MovementRecording.STREAM_CODEC.encode(buffer, recording);
+			MovementRecording decoded = MovementRecording.STREAM_CODEC.decode(buffer);
+			BlockVariant decodedVariant = decoded.blockVariant(Material.STONE, 7);
 
-			MoveFrame decoded = MoveFrame.LIST_STREAM_CODEC.decode(buffer).get(0);
-
-			assertTrue(decoded.gliding());
-			assertNull(decoded.physicalPose());
+			assertNotNull(decodedVariant);
+			assertEquals(7, decodedVariant.index());
+			assertTrue(decodedVariant.<Boolean>propertyOf("drag"));
+			assertEquals(3, (int) decodedVariant.propertyOf("distance"));
+			assertEquals(Direction.NORTH, decodedVariant.enumProperty(Direction.class, "facing"));
 		} finally {
 			buffer.release();
 		}
@@ -307,5 +324,34 @@ final class MovementRecordingSerializerTest {
 		Resource resource = Resources.memoryResource();
 		resource.write(byteArrayOutputStream.toByteArray());
 		return resource;
+	}
+
+	private static BlockVariant testVariant(int index, Map<String, Comparable<?>> properties) {
+		return new BlockVariant() {
+			@Override
+			public Set<String> propertyNames() {
+				return properties.keySet();
+			}
+
+			@Override
+			@SuppressWarnings("unchecked")
+			public <T> T propertyOf(String name) {
+				return (T) properties.get(name);
+			}
+
+			@Override
+			public <T extends Enum<T>> T enumProperty(Class<T> klass, String name) {
+				return Enum.valueOf(klass, properties.get(name).toString().toUpperCase());
+			}
+
+			@Override
+			public int index() {
+				return index;
+			}
+
+			@Override
+			public void dumpStates() {
+			}
+		};
 	}
 }

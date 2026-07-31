@@ -20,6 +20,7 @@ import de.jpx3.intave.block.fluid.Fluids;
 import de.jpx3.intave.block.physics.BlockPhysics;
 import de.jpx3.intave.block.shape.resolve.DenyShapeResolverPipeline;
 import de.jpx3.intave.block.shape.resolve.DrillResolver;
+import de.jpx3.intave.block.variant.BlockVariantRegister;
 import de.jpx3.intave.check.movement.physics.environment.Pose;
 import de.jpx3.intave.check.movement.physics.environment.SimulationEnvironment;
 import de.jpx3.intave.check.movement.physics.search.SimulationSearch;
@@ -65,6 +66,11 @@ import static org.junit.jupiter.api.Assertions.*;
 final class MovementRecordingPhysicsTests {
 	private static final UUID EMPTY_ID = UUID.fromString("00000000-0000-0000-0000-000000000000");
 	private static final double DIVERGED_MOTION_DISTANCE = 0.01;
+
+	@FunctionalInterface
+	interface MovementObserver {
+		void observe(int tick, Simulation simulation, Motion actualMotion);
+	}
 
 	@BeforeAll
 	static void setup() {
@@ -151,16 +157,33 @@ final class MovementRecordingPhysicsTests {
 	}
 
 	static void processRecordingResource(String resourcePath) throws IOException {
+		processRecordingResource(resourcePath, (tick, simulation, actualMotion) -> {
+		});
+	}
+
+	static void processRecordingResource(
+		String resourcePath,
+		MovementObserver observer
+	) throws IOException {
 		MovementRecording recording = MovementRecording.loadFrom(
 			Resources.resourceFromJarOrTestBuild(resourcePath)
 		);
 		preparePhysicsTestRuntime(recording);
-		processRecording(resourcePath, recording);
+		processRecording(resourcePath, recording, observer);
 	}
 
 	static void processRecording(
 		String resourcePath,
 		MovementRecording recording
+	) {
+		processRecording(resourcePath, recording, (tick, simulation, actualMotion) -> {
+		});
+	}
+
+	private static void processRecording(
+		String resourcePath,
+		MovementRecording recording,
+		MovementObserver observer
 	) {
 		System.out.print("\r[START] " + resourcePath + "...");
 		List<MoveFrame> frames = recording.frames();
@@ -247,6 +270,7 @@ final class MovementRecordingPhysicsTests {
 
 			double loss = simulation.positionDifference(metadata.position());
 			double allowedLoss = DIVERGED_MOTION_DISTANCE;
+			observer.observe(tick, simulation, metadata.sentOffsetMotion());
 			String output = formatDouble(loss, 4) + " " + simulation.offsetMotion() + " [actual: " + metadata.sentOffsetMotion() + "] " + simulation.configuration() + (!simulation.blueDetails().isEmpty() ? " [" + simulation.blueDetails() + "]" : "");
 			lastMessages.add(formatSearchHistoryRow(tick, loss, simulation, metadata.sentOffsetMotion()));
 
@@ -489,6 +513,7 @@ final class MovementRecordingPhysicsTests {
 		MinecraftVersion.setCurrent(serverVersion);
 		DrillResolver.manualInit(DenyShapeResolverPipeline.create());
 		Fluids.overrideFluids(recording.fluids());
+		BlockVariantRegister.overrideVariants(recording.blockVariants());
 		BlockPhysics.setup(serverVersion);
 	}
 
